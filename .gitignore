@@ -1,0 +1,7 @@
+node_modules/
+.bee-tmp/
+dist/
+tools/
+bee-audit-report/
+.DS_Store
+*.log
