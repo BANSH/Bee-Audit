@@ -1,0 +1,35 @@
+name: Deep SAST & Security
+on:
+  schedule:
+    - cron: '0 2 * * *' # Nightly
+  workflow_dispatch:
+
+jobs:
+  sast-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bee-Audit CLI
+        run: npm install -g bee-audit
+
+      - name: Run Bee-Audit SAST Layer
+        # Currently the CLI handles SAST as part of the core execution when config allows.
+        # Future iterations can execute `bee-audit sast-only` command.
+        run: |
+          bee-audit \
+            --repo-url ${{ github.server_url }}/${{ github.repository }} \
+            --branch ${{ github.head_ref || github.ref_name }} \
+            --skip-tests
+
+      - name: Upload SAST Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bee-audit-sast-report
+          path: bee-audit-report/

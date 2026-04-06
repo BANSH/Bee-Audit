@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import axios from 'axios';
-import { ScanResult } from '../../models/result';
+import { NormalizedScanResult, ScanFinding } from '../../models/result';
 
 const GITLEAKS_VERSION = '8.18.2';
 const TOOLS_DIR = path.join(__dirname, '../../../../tools/scanners'); // Moved deeper so it's safe
@@ -64,7 +64,8 @@ async function downloadGitleaks(): Promise<string | null> {
   }
 }
 
-export async function runGitleaks(repoDir: string): Promise<ScanResult> {
+export async function runGitleaks(repoDir: string): Promise<NormalizedScanResult> {
+  const startTime = Date.now();
   const customBinary = await downloadGitleaks();
   let cmd = 'gitleaks';
   
@@ -74,10 +75,12 @@ export async function runGitleaks(repoDir: string): Promise<ScanResult> {
     const checkSys = shell.exec('gitleaks version', { silent: true });
     if (checkSys.code !== 0) {
       return { 
-        step: 'gitleaks', 
+        step: 'gitleaks',
+        category: 'security',
         status: 'warn', 
         error: 'Gitleaks missing. Auto-download failed and not found in PATH.',
-        details: { findings: 0 }
+        findings: [],
+        durationMs: Date.now() - startTime
       };
     }
   }
@@ -87,19 +90,27 @@ export async function runGitleaks(repoDir: string): Promise<ScanResult> {
   
   const res = shell.exec(`"${cmd}" detect --source="${repoDir}" -v --report-path="${reportPath}" --report-format=json`, { silent: true });
   
-  let findingsCount = 0;
+  let findings: ScanFinding[] = [];
   if (fs.existsSync(reportPath)) {
     try {
       const report = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
-      findingsCount = report.length || 0;
+      if (Array.isArray(report)) {
+        findings = report.map((r: any) => ({
+          severity: 'critical',
+          summary: 'Secret Exposed: ' + (r.RuleID || 'Unknown'),
+          details: 'Secret match: ' + (r.Match || ''),
+          file: r.File,
+          line: r.StartLine
+        }));
+      }
     } catch(e) {}
   }
 
-  if (res.code === 0 && findingsCount === 0) {
-    return { step: 'gitleaks', status: 'pass', details: { findings: 0 } };
-  } else if (res.code === 1 || findingsCount > 0) {
-    return { step: 'gitleaks', status: 'fail', error: `Found ${findingsCount} potential secrets.`, details: { findings: findingsCount } };
+  if (res.code === 0 && findings.length === 0) {
+    return { step: 'gitleaks', category: 'security', status: 'pass', findings: [], durationMs: Date.now() - startTime };
+  } else if (res.code === 1 || findings.length > 0) {
+    return { step: 'gitleaks', category: 'security', status: 'fail', error: `Found ${findings.length} potential secrets.`, findings, durationMs: Date.now() - startTime };
   } else {
-    return { step: 'gitleaks', status: 'warn', error: 'Gitleaks execution failed unpredictably.', details: { code: res.code } };
+    return { step: 'gitleaks', category: 'security', status: 'warn', error: 'Gitleaks execution failed unpredictably.', findings: [], durationMs: Date.now() - startTime };
   }
 }

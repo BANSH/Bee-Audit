@@ -2,17 +2,18 @@ import shell from 'shelljs';
 import path from 'path';
 import fs from 'fs';
 import { PackageManager, ProjectInfo } from './detector';
-import { AuditStatus, ScanResult, WorkspaceResult } from '../models/result';
+import { NormalizedScanResult, WorkspaceResult } from '../models/result';
 
-function executeCommand(command: string, cwd: string): ScanResult {
+function executeCommand(command: string, cwd: string, stepName: string): NormalizedScanResult {
+  const startTime = Date.now();
   console.log(`[Runner] Executing: ${command}`);
   const result = shell.exec(command, { cwd, silent: true });
   
   if (result.code === 0) {
-    return { step: command, status: 'pass' };
+    return { step: stepName, category: 'static', status: 'pass', findings: [], durationMs: Date.now() - startTime };
   } else {
     // If it fails, capture output for debugging
-    return { step: command, status: 'fail', error: result.stderr || result.stdout };
+    return { step: stepName, category: 'static', status: 'fail', error: result.stderr || result.stdout, findings: [], durationMs: Date.now() - startTime };
   }
 }
 
@@ -26,16 +27,16 @@ function hasScript(packageJsonPath: string, scriptName: string): boolean {
   }
 }
 
-export function installDependencies(repoDir: string, pm: PackageManager): ScanResult {
+export function installDependencies(repoDir: string, pm: PackageManager): NormalizedScanResult {
   const installCmd = pm === 'npm' ? 'npm install --legacy-peer-deps' : `${pm} install`;
-  return executeCommand(installCmd, repoDir);
+  return executeCommand(installCmd, repoDir, 'install');
 }
 
 export function runChecks(repoDir: string, info: ProjectInfo): WorkspaceResult[] {
   const results: WorkspaceResult[] = [];
   const rootPkgPath = path.join(repoDir, 'package.json');
 
-  const runScript = (scriptName: string, fallbackCmd?: string): ScanResult => {
+  const runScript = (scriptName: string, fallbackCmd?: string): NormalizedScanResult => {
     let cmdToRun = '';
     
     if (info.hasTurbo) {
@@ -48,10 +49,10 @@ export function runChecks(repoDir: string, info: ProjectInfo): WorkspaceResult[]
     }
 
     if (!cmdToRun) {
-      return { step: scriptName, status: 'skipped', details: { reason: "No script found" } };
+      return { step: scriptName, category: 'static', status: 'skipped', error: "No script found", findings: [] };
     }
 
-    return executeCommand(cmdToRun, repoDir);
+    return executeCommand(cmdToRun, repoDir, scriptName);
   };
 
   const lintRes = runScript('lint');
