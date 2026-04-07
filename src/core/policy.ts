@@ -41,6 +41,10 @@ export const evaluatePolicies = (report: AuditReport, config: BeeAuditConfig): S
   if (report.security.logic.status === 'fail') {
     finalStatus = 'fail';
   }
+  
+  if (report.security.semgrep.status === 'fail') {
+    finalStatus = 'fail';
+  }
 
   // Emulate Warn mapping if any steps were warnings and we aren't failing
   if (finalStatus === 'pass') {
@@ -49,6 +53,7 @@ export const evaluatePolicies = (report: AuditReport, config: BeeAuditConfig): S
       report.security.secrets.status === 'warn' ||
       report.security.dependencies.status === 'warn' ||
       report.security.sast.status === 'warn' ||
+      report.security.semgrep.status === 'warn' ||
       report.security.dast.status === 'warn' ||
       report.security.logic.status === 'warn';
       
@@ -77,6 +82,7 @@ export const calculateScores = (report: Omit<AuditReport, 'scores' | 'summary'>)
   let security = 100;
   if (report.security.secrets.status === 'fail') security -= 50;
   if (report.security.sast.status === 'fail') security -= Math.min(50, report.security.sast.findings.length * 10);
+  if (report.security.semgrep.status === 'fail') security -= Math.min(50, report.security.semgrep.findings.length * 15);
   security = Math.max(0, security);
 
   // Dependency Score

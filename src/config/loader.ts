@@ -35,10 +35,17 @@ export interface LogicConfig {
   playwrightReportPath?: string;
 }
 
+export interface SemgrepConfig {
+  enabled: boolean;
+  rulesets: string[];
+  timeoutMs: number;
+}
+
 export interface BeeAuditConfig {
   policies: PolicyConfig;
   monorepo: MonorepoConfig;
-  sast: SastConfig;
+  sast: SastConfig; // Internal SAST
+  semgrep: SemgrepConfig; // Native Semgrep
   dast: DastConfig;
   logic: LogicConfig;
 }
@@ -59,6 +66,11 @@ const DEFAULT_CONFIG: BeeAuditConfig = {
     detectEval: true,
     detectUnsafeInnerHTML: true,
     detectConsoleEnv: true,
+  },
+  semgrep: {
+    enabled: true,
+    rulesets: ['p/javascript', 'p/typescript', 'p/security-audit'],
+    timeoutMs: 300000, // 5 minutes
   },
   dast: {
     enabled: false,
@@ -104,6 +116,7 @@ function mergeConfig(base: BeeAuditConfig, overrides: Partial<BeeAuditConfig>): 
     policies: { ...base.policies, ...(overrides.policies || {}) },
     monorepo: { ...base.monorepo, ...(overrides.monorepo || {}) },
     sast: { ...base.sast, ...(overrides.sast || {}) },
+    semgrep: { ...base.semgrep, ...(overrides.semgrep || {}) },
     dast: { ...base.dast, ...(overrides.dast || {}) },
     logic: { ...base.logic, ...(overrides.logic || {}) },
   };

@@ -60,7 +60,17 @@ export function generateMarkdownReport(reportDir: string, report: AuditReport) {
 
   md += `### 🛡️ Code Security (SAST & Secrets)\n`;
   md += `- **Gitleaks (Secrets)**: ${icon(report.security.secrets.status)} ${report.security.secrets.error || (report.security.secrets.findings.length > 0 ? report.security.secrets.findings.length + ' findings' : 'Clean')}\n`;
-  md += `- **Internal SAST**: ${icon(report.security.sast.status)} ${report.security.sast.error || ''}`;
+  
+  if (report.security.semgrep) {
+    if (report.security.semgrep.status === 'skipped') {
+      md += `- **Semgrep CE (SAST)**: ${icon('skipped')} SKIPPED (${report.security.semgrep.error})\n`;
+    } else {
+      md += `- **Semgrep CE (SAST)**: ${icon(report.security.semgrep.status)} ${report.security.semgrep.error || ''}`;
+      md += renderFindings(report.security.semgrep.findings);
+    }
+  }
+
+  md += `- **Internal Baseline SAST**: ${icon(report.security.sast.status)} ${report.security.sast.error || ''}`;
   md += renderFindings(report.security.sast.findings);
 
   md += `\n### 📦 Dependency Audit\n`;

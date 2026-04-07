@@ -31,7 +31,8 @@ export interface WorkspaceResult {
 export interface SecurityResult {
   secrets: NormalizedScanResult;
   dependencies: NormalizedScanResult;
-  sast: NormalizedScanResult;
+  sast: NormalizedScanResult; // Internal baseline SAST
+  semgrep: NormalizedScanResult; // Dedicated Semgrep CE SAST
   dast: NormalizedScanResult;
   logic: NormalizedScanResult;
 }

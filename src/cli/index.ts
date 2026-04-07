@@ -10,6 +10,7 @@ import { installDependencies, runChecks } from '../core/runner';
 import { runGitleaks } from '../core/scanners/gitleaks';
 import { runDependencyAudit } from '../core/scanners/audit';
 import { runInternalSast } from '../core/scanners/sast';
+import { runSemgrepScan } from '../core/scanners/semgrep';
 import { runDastScan, parseZapReport } from '../core/scanners/dast';
 import { runLogicScan, parsePlaywrightReport } from '../core/scanners/logic';
 
@@ -72,8 +73,9 @@ program
       const workspaces = runChecks(repoDir, info);
       spinner.succeed('Completed static checks');
 
-      spinner.text = 'Step 5: Code Security Layer (Secrets & Internal SAST)...';
+      spinner.text = 'Step 5: Code Security Layer (Secrets, Semgrep & Internal SAST)...';
       const gitleaksRes = await runGitleaks(repoDir);
+      const semgrepRes = await runSemgrepScan(repoDir, config);
       const sastRes = await runInternalSast(repoDir, config);
       spinner.succeed('Completed Code Security Layer');
 
@@ -94,6 +96,7 @@ program
           secrets: gitleaksRes,
           dependencies: auditRes,
           sast: sastRes,
+          semgrep: semgrepRes,
           dast: dastRes,
           logic: logicRes
         },
