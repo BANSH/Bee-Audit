@@ -1,7 +1,7 @@
 {
-  "name": "bee-audit",
-  "version": "1.0.0",
-  "description": "Comprehensive Code Inspection System for JS/TS & Monorepos",
+  "name": "@bansh/bee-audit",
+  "version": "0.1.0",
+  "description": "Unified security and quality gate for JavaScript/TypeScript repositories and monorepos.",
   "main": "dist/cli/index.js",
   "bin": {
     "bee-audit": "./bin/bee-audit.js"

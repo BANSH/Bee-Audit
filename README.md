@@ -1,67 +1,246 @@
-# Bee-Audit 🐝
+# Bee-Audit
 
-Bee-Audit is a powerful, standalone Code Inspection System built for JavaScript/TypeScript projects, with first-class support for Monorepos (Turborepo, Nx, Pnpm Workspaces) and Next.js applications.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](#)
+[![Status](https://img.shields.io/badge/status-experimental-orange)](#)
 
-It provides a unified Command Line Interface (CLI) and a reusable GitHub Actions CI workflow to ensure your codebase is completely secure, robust, and free of vulnerabilities.
+> Unified security and quality gate for JavaScript/TypeScript repositories and monorepos.
+
+Bee-Audit helps you answer one hard question before you trust or merge code:
+
+> **Is this repository healthy and safe enough to ship?**
+
+Instead of relying on one tool, Bee-Audit orchestrates multiple scanners — linting, type checks, tests, secrets scanning, dependency audits, SAST (Semgrep), and (soon) runtime security and business-logic checks — into **one pipeline, one report, and one pass/warn/fail decision.**
+
+---
+
+## Why Bee-Audit?
+
+Modern JS/TS projects typically rely on a mix of tools:
+
+- ESLint for style
+- Jest/Vitest/Playwright for tests
+- Gitleaks for secrets
+- npm/yarn audit for dependencies
+- Semgrep / Sonar / CodeQL for SAST
+- ZAP / DAST tools for runtime checks
+
+Each produces its own output, often in different places, with different severity models.
+
+**Bee-Audit does not try to replace these tools.**  
+It focuses on:
+
+- Running them **consistently** (locally and in CI)
+- **Normalizing** their outputs
+- Applying a **policy engine** on top
+- Producing **one human-readable dashboard** and **one machine-readable JSON** for automation.
+
+This makes Bee-Audit useful for:
+
+- Pre-merge quality and security gates
+- Auditing client repositories
+- Monorepo hygiene checks
+- Security reviews for JS/TS projects
+
+---
 
 ## Features
 
-- **Automated Repository Cloning:** Securely fetches targeted branches.
-- **Environment Detection:** Automatically identifies `pnpm`, `npm`, `yarn`, and Monorepo structures.
-- **Code Quality:** Resiliently runs `lint`, `type-check`, and `test` suites.
-- **Secrets Scanning:** Auto-downloads and executes `Gitleaks` securely across the repository history.
-- **Dependency Security:** Performs vulnerability limits checks via package manager `audit`.
-- **Normalized Reporting:** Outputs a clear Markdown `summary.md` and machine-readable `details.json`.
+- 🧩 **Unified CLI** for auditing any GitHub repository
+- 🔁 **GitHub Actions workflows** for automatic checks on PRs and pushes
+- 📂 **Monorepo-aware detection** (`pnpm`, `turbo`, `nx`, `apps/*`, `packages/*`)
+- 🧹 **Static & hygiene checks**
+  - Lint (when available)
+  - Type-check (when TypeScript present)
+  - Tests (when configured)
+- 🕵️‍♂️ **Secrets scanning**
+  - Gitleaks integration (repo + git history)
+- 🧪 **Dependency risk auditing**
+  - npm / yarn / pnpm audit parsing
+- 🛡 **SAST (Static Application Security Testing)**
+  - Internal baseline SAST (pattern-based)
+  - Semgrep CE integration (JS/TS + security rules)
+- ⚖️ **Policy engine**
+  - Configurable thresholds (secrets, vulns, test failures)
+  - Security/Quality/Dependencies/Runtime scoring out of 100
+  - Unified pass / warn / fail verdict
+- 📊 **Reporting**
+  - `bee-audit-report/summary.md` — human-readable dashboard
+  - `bee-audit-report/details.json` — normalized structured output
+- 🧱 **Extensible architecture**
+  - Orchestration scaffolding configured for future Phase expansions.
 
 ---
 
-## Local Development & Usage
+## How it works
 
-### 1. Installation
+At a high level:
 
-If you're running it locally from this source directory:
+1. **Clone** the target repository into a temporary directory.
+2. **Detect** package manager and workspace layout:
+   - npm / pnpm / yarn
+   - single repo / monorepo (`apps/*`, `packages/*`)
+3. **Install** dependencies.
+4. **Run scanners**:
+   - Lint / type-check / tests
+   - Gitleaks (secrets)
+   - Dependency audit
+   - **Semgrep (SAST)**
+   - Internal baseline SAST
+5. **Normalize results** into a common schema.
+6. **Apply policy engine**:
+   - Fail if secrets found (configurable)
+   - Fail if high/critical vulns > threshold
+   - Fail if required tests/lint/type-check fail
+7. **Generate reports**:
+   - Markdown summary
+   - JSON details
+8. **Exit with code**:
+   - `0` for pass/warn
+   - `1` for fail (blocking gate)
+
+---
+
+## Example Output
+
+![Bee-Audit Summary](./docs/summary-example.png)
+
+---
+
+## Quick start (CLI)
+
+> Requires Node.js (LTS) and git installed.
+
 ```bash
+# Clone Bee-Audit
+git clone https://github.com/BANSH/Bee-Audit.git
+cd Bee-Audit
+
+# Install dependencies
 npm install
+
+# Build CLI
 npm run build
+
+# Run audit against a repository
+node bin/bee-audit.js audit \
+  --repo-url https://github.com/vercel/nextjs-portfolio-starter.git \
+  --branch main
 ```
 
-### 2. Using the CLI
+After it finishes, open:
 
-Run the tool locally against any GitHub repository:
-
-```bash
-npx bee-audit --repo-url https://github.com/facebook/react --branch main
-```
-
-**Options:**
-- `--repo-url`: Repository URL (HTTPS or SSH).
-- `--branch`: Specific branch to test (default: `main`).
-- `--skip-tests`: Bypass the testing phase.
-- `--workdir`: Override the temporary clone directory.
-
-### 3. Generated Output
-
-Upon completion, a **`bee-audit-report/`** directory is created in your Current Working Directory containing:
-- `summary.md`: Human-readable status matrix.
-- `details.json`: Raw telemetry data for dashboards.
+- `bee-audit-report/summary.md`
+- `bee-audit-report/details.json`
 
 ---
 
-## GitHub Actions CI Integration
+## Configuration
 
-To integrate Bee-Audit into your repository's CI/CD pipeline, simply copy the `templates/bee-audit.yml` file into your `.github/workflows/` directory.
+Bee-Audit reads a `bee-audit.config.json` file in the **target repository** (if present).  
+Example:
 
-```bash
-mkdir -p .github/workflows
-cp tools/bee-audit/templates/bee-audit.yml .github/workflows/
+```json
+{
+  "policies": {
+    "failOnSecrets": true,
+    "maxHighCriticalVulnerabilities": 0,
+    "failOnTestFailure": true,
+    "failOnLintFailure": true
+  },
+  "monorepo": {
+    "enabled": true,
+    "excludePatterns": ["node_modules", "dist", ".next"]
+  },
+  "semgrep": {
+    "enabled": true,
+    "rulesets": [
+      "p/javascript",
+      "p/typescript",
+      "p/security-audit"
+    ],
+    "timeoutMs": 300000
+  },
+  "dast": {
+    "enabled": false,
+    "targetUrl": null
+  },
+  "logic": {
+    "enabled": false
+  }
+}
 ```
 
-### CI Pipeline Highlights
-- **Gitleaks Action:** Hard-fails the pull request if API Keys or Secrets are committed.
-- **Audit Limits:** Hard-fails the build if `Critical` or `High` vulnerabilities exist in `package.json`.
-- **SonarQube (Phase 2):** Sonar analysis is cleanly stubbed in the YAML. To enable it, uncomment the block and add your `SONAR_TOKEN` to your GitHub Repository Secrets.
+If no config is found, Bee-Audit falls back to **safe defaults** (e.g. fail on any secrets or high/critical vulnerabilities).
 
-### Monorepo Support Notes
-The CI template includes hints for utilizing `turbo run test`. If `turbo.json` is detected locally by the CLI, it natively overrides default `npm run test` with `npx turbo run test --continue`.
+---
 
-*Bee OS Sovereign Intelligence Initiative.*
+## GitHub Actions (templates)
+
+Bee-Audit ships with workflows under `templates/` to help you wire it into CI:
+
+- `core-audit.yml` — static, secrets, dependencies
+- `sast.yml` — deeper SAST
+- `runtime-security.yml` — DAST with OWASP ZAP (Scaffolding Phase)
+- `logic-e2e.yml` — Playwright E2E logic checks (Scaffolding Phase)
+
+Example (core audit):
+
+```yaml
+# .github/workflows/bee-core-audit.yml
+name: Bee-Audit Core
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bee-Audit deps
+        run: |
+          npm install
+          npm run build
+
+      - name: Run Bee-Audit
+        run: |
+          node bin/bee-audit.js audit --repo-url ${{ github.repositoryUrl }} --branch ${{ github.ref_name }}
+
+      - name: Upload Bee-Audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bee-audit-report
+          path: bee-audit-report/
+```
+
+---
+
+## Roadmap
+
+- [x] Core CLI (clone + lint + type-check + tests)
+- [x] Secrets scanning with Gitleaks
+- [x] Dependency audit integration
+- [x] Normalized result schema
+- [x] Policy engine + scoring
+- [x] **Semgrep CE SAST integration (Phase 1 Stage 1)**
+- [ ] Advanced Gitleaks configuration (history/scope, allowlists)
+- [ ] ZAP integration via `bee-audit merge` mode
+- [ ] Playwright logic integration via `bee-audit merge`
+- [ ] Deduplication and unified scoring across scanners
+- [ ] NPM package and `npx bee-audit` distribution
+
+---
+
+## License
+
+Bee-Audit is licensed under the MIT License.  
+See [`LICENSE`](./LICENSE) for details.
