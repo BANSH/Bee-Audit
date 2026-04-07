@@ -5,3 +5,7 @@ tools/
 bee-audit-report/
 .DS_Store
 *.log
+test-*.json
+details.json
+summary.md
+bee-audit-report/

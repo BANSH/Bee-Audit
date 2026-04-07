@@ -12,16 +12,50 @@ jobs:
     if: github.event.deployment_status.state == 'success' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: ZAP Baseline Scan
+      - uses: actions/checkout@v4
+
+      - name: Download Core Bee-Audit Report
+        uses: actions/download-artifact@v4
+        with:
+          name: bee-audit-core-report
+          path: bee-audit-report/
+        continue-on-error: true # Might not exist if run independently
+
+      - name: 🟢 ZAP Baseline Scan (Smart Graded)
+        id: zap_baseline
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: ${{ github.event.inputs.target_url || github.event.deployment_status.environment_url }}
-          rules_file_name: '.zap/rules.tsv'
+          format: json
           cmd_options: '-a'
 
-      - name: Upload ZAP Report
+      - name: 🔴 ZAP Full Scan (If Baseline Clears)
+        if: steps.zap_baseline.outcome == 'success'
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: ${{ github.event.inputs.target_url || github.event.deployment_status.environment_url }}
+          format: json
+
+      - name: Setup Node.js
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bee-Audit CLI
+        if: always()
+        run: npm install -g bee-audit
+
+      - name: 🐝 Execute Bee-Audit Orchestration Merge
+        if: always()
+        run: |
+          bee-audit merge \
+            --base-report bee-audit-report/details.json \
+            --zap-report report_json.json
+
+      - name: Upload Final Unified Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zap-dast-report
-          path: report_html.html
+          name: bee-audit-final-report
+          path: bee-audit-report/

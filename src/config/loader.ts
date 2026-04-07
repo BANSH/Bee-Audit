@@ -23,10 +23,16 @@ export interface SastConfig {
 export interface DastConfig {
   enabled: boolean;
   targetUrl?: string; // Automatically triggers Phase 3 checks
+  zapReportPath?: string;
   auth?: {
     enabled: boolean;
     loginPath: string;
   };
+}
+
+export interface LogicConfig {
+  enabled: boolean;
+  playwrightReportPath?: string;
 }
 
 export interface BeeAuditConfig {
@@ -34,6 +40,7 @@ export interface BeeAuditConfig {
   monorepo: MonorepoConfig;
   sast: SastConfig;
   dast: DastConfig;
+  logic: LogicConfig;
 }
 
 const DEFAULT_CONFIG: BeeAuditConfig = {
@@ -55,6 +62,11 @@ const DEFAULT_CONFIG: BeeAuditConfig = {
   },
   dast: {
     enabled: false,
+    zapReportPath: './report_json.json'
+  },
+  logic: {
+    enabled: false,
+    playwrightReportPath: './playwright-report/results.json'
   }
 };
 
@@ -93,5 +105,6 @@ function mergeConfig(base: BeeAuditConfig, overrides: Partial<BeeAuditConfig>): 
     monorepo: { ...base.monorepo, ...(overrides.monorepo || {}) },
     sast: { ...base.sast, ...(overrides.sast || {}) },
     dast: { ...base.dast, ...(overrides.dast || {}) },
+    logic: { ...base.logic, ...(overrides.logic || {}) },
   };
 }
